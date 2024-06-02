@@ -1,5 +1,6 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcrypt";
 
 const app = express();
 const PORT = 4000;
@@ -7,6 +8,63 @@ const PORT = 4000;
 const prisma = new PrismaClient();
 
 app.use(express.json());
+
+app.post("/register", async (req, res) => {
+  const { name, email, password } = req.body;
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  await prisma.users.create({
+    data: {
+      name: name,
+      email: email,
+      password: hashedPassword,
+    },
+  });
+
+  return res.json({
+    success: true,
+    message: "Register successfully",
+  });
+});
+
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  const user = await prisma.users.findUnique({
+    where: {
+      email: email,
+    },
+  });
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
+  if (!user?.password) {
+    return res.status(404).json({
+      success: false,
+      message: "Password not set",
+    });
+  }
+
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+
+  if (!isPasswordValid) {
+    return res.status(403).json({
+      success: false,
+      message: "Password is wrong",
+    });
+  }
+
+  return res.json({
+    success: true,
+    message: "Login successfully",
+  });
+});
 
 app.post("/users", async (req, res) => {
   const { name, email, address } = req.body;
